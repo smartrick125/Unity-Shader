@@ -1,0 +1,119 @@
+Shader "Unity Shaders Book/Chapter 7/Normal Map World Space"
+{
+    Properties
+    {
+        [MainColor] _BaseColor("Base Color", Color) = (1, 1, 1, 1)
+        [MainTexture] _BaseMap("Base Map", 2D) = "white" {}
+
+        _NormalMap("NormalMap", 2D) = "bump"{}
+        _NormalScale("Bump Scale", Range(-2, 2)) = 1
+
+        _SpecularColor("Specular", Color) = (1, 1, 1, 1)
+        _Gloss("Gloss", Range(8, 256)) = 32
+    }
+
+    SubShader
+    {
+        Tags { "RenderType" = "Opaque" "RenderPipeline" = "UniversalPipeline" }
+
+        Pass
+        {
+            Tags { "LightMode" = "UniversalForward" }
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float4 tangentOS  : TANGENT;
+                float2 uv : TEXCOORD0;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                
+                float2 uv : TEXCOORD0;
+
+                float4 TtoW0 : TEXCOORD1;
+                float4 TtoW1 : TEXCOORD2;
+                float4 TtoW2 : TEXCOORD3;
+            };
+
+            TEXTURE2D(_BaseMap);
+            SAMPLER(sampler_BaseMap);
+            TEXTURE2D(_NormalMap);
+            SAMPLER(sampler_NormalMap);
+
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _BaseMap_ST;
+                float4 _NormalMap_ST;
+
+                half4 _BaseColor;
+                half4 _SpecularColor;
+
+                float _Gloss;
+                float _NormalScale;
+            CBUFFER_END
+
+            Varyings vert(Attributes v)
+            {
+                Varyings o;
+
+                VertexPositionInputs pos = GetVertexPositionInputs(v.positionOS.xyz);
+                VertexNormalInputs norm = GetVertexNormalInputs(v.normalOS, v.tangentOS);
+                
+                float3 positionWS = pos.positionWS;
+
+                o.positionCS = pos.positionCS;
+                o.uv = TRANSFORM_TEX(v.uv, _BaseMap);
+
+                o.TtoW0 = float4(norm.tangentWS.x, norm.bitangentWS.x, norm.normalWS.x, positionWS.x);
+                o.TtoW1 = float4(norm.tangentWS.y, norm.bitangentWS.y, norm.normalWS.y, positionWS.y);
+                o.TtoW2 = float4(norm.tangentWS.z, norm.bitangentWS.z, norm.normalWS.z, positionWS.z);
+            
+                return o;
+            }
+
+            half4 frag(Varyings i) : SV_Target
+            {
+                
+                float2 normalUV = TRANSFORM_TEX(i.uv, _NormalMap);
+                float4 packed = SAMPLE_TEXTURE2D(_NormalMap, sampler_NormalMap, normalUV);
+                
+                float3 normalTS;
+                normalTS.xy = (packed.xy * 2 - 1) * _NormalScale;
+                normalTS.z = sqrt(1 - saturate(dot(normalTS.xy, normalTS.xy)));
+                
+                float3 normalWS = normalize(float3
+                (dot(i.TtoW0.xyz, normalTS),
+                 dot(i.TtoW1.xyz, normalTS),
+                 dot(i.TtoW2.xyz, normalTS)));
+                
+                Light light = GetMainLight();
+                float3 lightDir = normalize(light.direction);
+                
+                half4 albedo = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv) * _BaseColor;
+                float NdotL = saturate(dot(normalWS, lightDir));
+                float3 diffuse = albedo.rgb * light.color * NdotL;
+                
+                float3 positionWS = float3(i.TtoW0.w, i.TtoW1.w, i.TtoW2.w);
+                float3 viewDir = normalize(GetWorldSpaceViewDir(positionWS));
+                
+                float3 halfDir = normalize(lightDir + viewDir);
+                float spec = pow(saturate(dot(normalWS, halfDir)), _Gloss);
+                float3 specular = light.color * _SpecularColor.rgb * spec;
+                    
+                return float4(diffuse + specular, 1);
+            }
+            ENDHLSL
+        }
+    }
+}
