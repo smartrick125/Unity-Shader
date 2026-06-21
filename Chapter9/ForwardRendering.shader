@@ -6,12 +6,7 @@ Shader "Unity Shaders Book/Chapter 9/ForwardRendering"
 		_Gloss ("Gloss", Range(8.0, 256)) = 20
 	}
 	SubShader {
-		Tags
-		{ 
-			"RenderPipeline"="UniversalPipeline"
-			"RenderType"="Opaque"
-			"Queue" = "Geometry"
-		}
+		Tags { "RenderPipeline"="UniversalPipeline" "RenderType"="Opaque" "Queue" = "Geometry" }
 		
 		Cull Off
 		ZWrite On
