@@ -70,13 +70,11 @@ Shader "Custom/GaussianBlur"
 
         half4 FragVertical(Varyings input) : SV_Target
         {
-            UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
             return SampleGaussianBlur(input.texcoord, float2(0.0, 1.0));
         }
 
         half4 FragHorizontal(Varyings input) : SV_Target
         {
-            UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
             return SampleGaussianBlur(input.texcoord, float2(1.0, 0.0));
         }
 
